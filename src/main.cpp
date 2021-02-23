@@ -1,7 +1,9 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
 #include <PubSubClient.h>
 #include <ESP8266Ping.h>
+#include "index.h"
 #include "secrets.h"
 
 const String SSID = WIFI_SSID;
@@ -18,6 +20,7 @@ const int wet = 294;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
+ESP8266WebServer server(80);
 IPAddress ip;
 int percentageMoisture = 0;
 
@@ -26,6 +29,9 @@ unsigned long lastMsg = 0;
 char msg[MSG_BUFFER_SIZE];
 int value = 0;
 
+void handleRoot();
+void handleHumidity();
+void handleNotFound();
 void callback(char *topic, byte *payload, unsigned int length);
 void reconnect();
 
@@ -49,6 +55,12 @@ void setup()
   ip = WiFi.localIP();
   Serial.print("I got the ip ");
   Serial.println(ip);
+  Serial.println("Start web server");
+  server.on("/", handleRoot);
+  server.on("/humidity", handleHumidity);
+  server.onNotFound(handleNotFound);
+  server.begin();
+  Serial.println("Web server started");
 
   bool ret = Ping.ping(mqtt_server);
   if (ret)
@@ -87,6 +99,21 @@ void loop()
     Serial.println(msg);
     client.publish(mqtt_topic, msg);
   }
+}
+
+void handleRoot()
+{
+  server.send(200, "text/html", index_html); // Send HTTP status 200 (Ok) and send some text to the browser/client
+}
+
+void handleHumidity()
+{
+  server.send(200, "text/plain", String(percentageMoisture)); // Send HTTP status 200 (Ok) and send some text to the browser/client
+}
+
+void handleNotFound()
+{
+  server.send(404, "text/plain", "404: Not found"); // Send HTTP status 404 (Not Found) when there's no handler for the URI in the request
 }
 
 void callback(char *topic, byte *payload, unsigned int length)
